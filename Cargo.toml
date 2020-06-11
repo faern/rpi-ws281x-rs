@@ -1,8 +1,10 @@
 [package]
 name = "ws281x"
 version = "0.1.0"
-authors = ["Linus Färnstrand <faern@faern.net>"]
 edition = "2018"
+authors = ["Linus Färnstrand <faern@faern.net>"]
+
+links = "ws281x"
 
 [dependencies]
 
