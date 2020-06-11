@@ -1,5 +1,5 @@
 [package]
-name = "ws281x"
+name = "rpi-ws281x"
 version = "0.1.0"
 edition = "2018"
 authors = ["Linus Färnstrand <faern@faern.net>"]
