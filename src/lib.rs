@@ -2,28 +2,23 @@ use std::convert::TryFrom;
 use std::os::raw::c_int;
 use std::ptr;
 
-/// The bindgen generated bindings to rpi_ws281x C library
-#[allow(non_camel_case_types, dead_code)]
-mod ffi;
+pub use rpi_ws281x_sys as sys;
 
 mod error;
 pub use error::{Error, Result};
 mod led;
 pub use led::Led;
 
-/// The number of LED channels this library can drive on the RPi.
-pub const NUM_CHANNELS: usize = ffi::RPI_PWM_CHANNELS as usize;
-
 /// A channel represents one GPIO pin sending a signal to one strip of LEDs.
-/// There can be up to `NUM_CHANNELS` `Channel`s on one [`Controller`].
+/// There can be up to `sys::RPI_PWM_CHANNELS` `Channel`s on one [`Controller`].
 ///
 /// The channel instance is handed over to [`Builder::channel`].
-pub struct Channel(ffi::ws2811_channel_t);
+pub struct Channel(sys::ws2811_channel_t);
 
 impl Channel {
     /// Creates a new channel on the given GPIO pin with the given amount of LEDs.
     pub fn new(gpio_pin: u8, led_count: u16) -> Self {
-        Self(ffi::ws2811_channel_t {
+        Self(sys::ws2811_channel_t {
             gpionum: c_int::from(gpio_pin),
             invert: 0,
             count: c_int::from(led_count),
@@ -57,8 +52,8 @@ impl Channel {
     }
 
     /// Returns a disabled LED strip channel. Used internally.
-    fn disabled_raw() -> ffi::ws2811_channel_t {
-        ffi::ws2811_channel_t {
+    fn disabled_raw() -> sys::ws2811_channel_t {
+        sys::ws2811_channel_t {
             gpionum: 0,
             invert: 0,
             count: 0,
@@ -76,16 +71,16 @@ impl Channel {
 
 /// A builder for [`Controller`] structs. Sets up and initializes the hardware for controlling the
 /// LEDs and returns a controller that is then used for actually rendering anything to the LEDs.
-pub struct Builder(ffi::ws2811_t);
+pub struct Builder(sys::ws2811_t);
 
 impl Builder {
     /// Creates a new [`Controller`] builder using the given DMA channel.
     pub fn new(dma_channel: u8) -> Self {
-        Self(ffi::ws2811_t {
+        Self(sys::ws2811_t {
             render_wait_time: 0,
             device: ptr::null_mut(),
             rpi_hw: ptr::null(),
-            freq: ffi::WS2811_TARGET_FREQ,
+            freq: sys::WS2811_TARGET_FREQ,
             dmanum: i32::from(dma_channel),
             channel: [Channel::disabled_raw(), Channel::disabled_raw()],
         })
@@ -101,7 +96,7 @@ impl Builder {
     ///
     /// # Panics
     ///
-    /// Panics if `index >= NUM_CHANNELS`.
+    /// Panics if `index >= rpi_ws281x_sys::RPI_PWM_CHANNELS`.
     pub fn channel(mut self, index: usize, channel: Channel) -> Self {
         self.0.channel[index] = channel.0;
         self
@@ -110,16 +105,16 @@ impl Builder {
     /// Tries to initialize the hardware to control LEDs in the way the builder is configured.
     /// Returns the [`Controller`] on success.
     pub fn build(mut self) -> Result<Controller> {
-        assert_eq!(NUM_CHANNELS, self.0.channel.len());
-        match unsafe { ffi::ws2811_init(&mut self.0) } {
-            ffi::ws2811_return_t::WS2811_SUCCESS => Ok(Controller(self.0)),
+        assert_eq!(usize::try_from(sys::RPI_PWM_CHANNELS).unwrap(), self.0.channel.len());
+        match unsafe { sys::ws2811_init(&mut self.0) } {
+            sys::ws2811_return_t::WS2811_SUCCESS => Ok(Controller(self.0)),
             error => Err(Error(error)),
         }
     }
 }
 
 /// A ws281x LED controller. Instances of this type are created via the [`Builder`].
-pub struct Controller(ffi::ws2811_t);
+pub struct Controller(sys::ws2811_t);
 
 impl Controller {
     /// Returns a mutable slice where all the LED values can be set directly.
@@ -136,8 +131,8 @@ impl Controller {
     ///
     /// See [`render_buffer`] for a way to supply the buffer and render it in one call.
     pub fn render(&mut self) -> Result<()> {
-        match unsafe { ffi::ws2811_render(&mut self.0) } {
-            ffi::ws2811_return_t::WS2811_SUCCESS => Ok(()),
+        match unsafe { sys::ws2811_render(&mut self.0) } {
+            sys::ws2811_return_t::WS2811_SUCCESS => Ok(()),
             error => Err(Error(error)),
         }
     }
@@ -150,8 +145,8 @@ impl Controller {
     ///
     /// Panics if any of the `&[Led]` slices are not the same length as the corresponding
     /// [`Channel`]s `led_count` as given to the [`Channel`] constructor.
-    pub fn render_buffer(&mut self, buffers: [&[Led]; NUM_CHANNELS]) -> Result<()> {
-        let original_leds_ptrs: [*mut ffi::ws2811_led_t; NUM_CHANNELS] =
+    pub fn render_buffer(&mut self, buffers: [&[Led]; sys::RPI_PWM_CHANNELS as usize]) -> Result<()> {
+        let original_leds_ptrs: [*mut sys::ws2811_led_t; sys::RPI_PWM_CHANNELS as usize] =
             [self.0.channel[0].leds, self.0.channel[1].leds];
 
         assert_eq!(self.0.channel[0].count as usize, buffers[0].len());
@@ -171,7 +166,7 @@ impl Controller {
 
 impl Drop for Controller {
     fn drop(&mut self) {
-        unsafe { ffi::ws2811_fini(&mut self.0) };
+        unsafe { sys::ws2811_fini(&mut self.0) };
     }
 }
 
@@ -181,18 +176,18 @@ impl Drop for Controller {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(u32)]
 pub enum StripType {
-    Rgb = ffi::WS2811_STRIP_RGB,
-    Rbg = ffi::WS2811_STRIP_RBG,
-    Grb = ffi::WS2811_STRIP_GRB,
-    Gbr = ffi::WS2811_STRIP_GBR,
-    Brg = ffi::WS2811_STRIP_BRG,
-    Bgr = ffi::WS2811_STRIP_BGR,
-    Rgbw = ffi::SK6812_STRIP_RGBW,
-    Rbgw = ffi::SK6812_STRIP_RBGW,
-    Grbw = ffi::SK6812_STRIP_GRBW,
-    Gbrw = ffi::SK6812_STRIP_GBRW,
-    Brgw = ffi::SK6812_STRIP_BRGW,
-    Bgrw = ffi::SK6812_STRIP_BGRW,
+    Rgb = sys::WS2811_STRIP_RGB,
+    Rbg = sys::WS2811_STRIP_RBG,
+    Grb = sys::WS2811_STRIP_GRB,
+    Gbr = sys::WS2811_STRIP_GBR,
+    Brg = sys::WS2811_STRIP_BRG,
+    Bgr = sys::WS2811_STRIP_BGR,
+    Rgbw = sys::SK6812_STRIP_RGBW,
+    Rbgw = sys::SK6812_STRIP_RBGW,
+    Grbw = sys::SK6812_STRIP_GRBW,
+    Gbrw = sys::SK6812_STRIP_GBRW,
+    Brgw = sys::SK6812_STRIP_BRGW,
+    Bgrw = sys::SK6812_STRIP_BGRW,
 }
 
 impl StripType {

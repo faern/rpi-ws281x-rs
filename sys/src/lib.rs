@@ -3,6 +3,8 @@
 // Generated using bindgen 0.54.0
 // Generated against rpi_ws281x 6a720cbd42d30be28e0f5c5ff6b1c00a4588a29b
 
+#![allow(non_camel_case_types, dead_code)]
+
 pub const RPI_PWM_CHANNELS: u32 = 2;
 pub const WS2811_TARGET_FREQ: u32 = 800000;
 pub const SK6812_STRIP_RGBW: u32 = 403703808;
@@ -18,6 +20,7 @@ pub const WS2811_STRIP_GBR: u32 = 524304;
 pub const WS2811_STRIP_BRG: u32 = 4104;
 pub const WS2811_STRIP_BGR: u32 = 2064;
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct rpi_hw_t {
     pub type_: u32,
     pub hwver: u32,
@@ -32,6 +35,7 @@ pub struct ws2811_device {
 }
 pub type ws2811_led_t = u32;
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct ws2811_channel_t {
     pub gpionum: ::std::os::raw::c_int,
     pub invert: ::std::os::raw::c_int,
@@ -46,6 +50,7 @@ pub struct ws2811_channel_t {
     pub gamma: *mut u8,
 }
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct ws2811_t {
     pub render_wait_time: u64,
     pub device: *mut ws2811_device,

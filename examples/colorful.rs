@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use ws281x::{Led, StripType};
+use rpi_ws281x::{Led, StripType};
 
 /// Full circle.
 const TAU: f32 = 2.0 * PI;
@@ -21,10 +21,10 @@ const STD_DEV_BLUE: f32 = 0.12;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let led_count: u16 = 19;
 
-    let mut strip = ws281x::Builder::new(10)
+    let mut strip = rpi_ws281x::Builder::new(10)
         .channel(
             0,
-            ws281x::Channel::new(10, led_count)
+            rpi_ws281x::Channel::new(10, led_count)
                 .strip_type(StripType::Grb)
                 .brightness(255),
         )

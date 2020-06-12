@@ -1,12 +1,11 @@
-use crate::ffi;
-use std::fmt;
+use std::fmt;use crate::sys;
 
 /// Represents a single LED on a strip of ws281x LEDs. Contains a one byte value for the brightness
 /// of the red, green, blue and white channels of the LED. The library represents an LED strip
 /// as a slice of these structs.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(transparent)]
-pub struct Led(ffi::ws2811_led_t);
+pub struct Led(sys::ws2811_led_t);
 
 impl Led {
     /// All channels turned off.
@@ -97,14 +96,14 @@ impl core::ops::MulAssign<f32> for Led {
     }
 }
 
-impl From<u32> for Led {
-    fn from(raw: u32) -> Self {
+impl From<sys::ws2811_led_t> for Led {
+    fn from(raw: sys::ws2811_led_t) -> Self {
         Self(raw)
     }
 }
 
-impl From<Led> for u32 {
-    fn from(led: Led) -> u32 {
+impl From<Led> for sys::ws2811_led_t {
+    fn from(led: Led) -> sys::ws2811_led_t {
         led.0
     }
 }

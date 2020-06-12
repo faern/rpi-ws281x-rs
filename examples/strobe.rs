@@ -1,7 +1,7 @@
 use std::thread;
 use std::time::Duration;
 
-use ws281x::Led;
+use rpi_ws281x::Led;
 
 const INTERVAL: Duration = Duration::from_millis(300);
 
@@ -11,8 +11,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let on = vec![Led::ON; led_count as usize];
     let off = vec![Led::OFF; led_count as usize];
 
-    let mut strip = ws281x::Builder::new(10)
-        .channel(0, ws281x::Channel::new(10, led_count).brightness(100))
+    let mut strip = rpi_ws281x::Builder::new(10)
+        .channel(0, rpi_ws281x::Channel::new(10, led_count).brightness(100))
         .build()?;
 
     loop {
