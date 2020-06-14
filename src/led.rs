@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(led * 1.5, Led::new(0, 2, 150, 255));
         assert_eq!(led * 2.0, Led::new(0, 2, 200, 255));
         assert_eq!(led * 1000.0, Led::new(0, 255, 255, 255));
-        assert_eq!(led * f32::INFINITY, Led::MAX);
+        assert_eq!(led * f32::INFINITY, Led::ON);
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
         assert_eq!(led + Led::new(1, 2, 3, 4), Led::new(1, 3, 103, 204));
 
         let bright = Led::new(201, 202, 203, 204);
-        assert_eq!(bright + bright, Led::MAX);
+        assert_eq!(bright + bright, Led::ON);
     }
 
     #[test]
