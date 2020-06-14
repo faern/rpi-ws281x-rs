@@ -12,6 +12,7 @@ bindgen \
     --no-doc-comments \
     --use-core \
     --no-layout-tests \
+    --no-derive-copy \
     --raw-line "// Generated using $BINDGEN_VERSION" \
     --raw-line "// Generated against rpi_ws281x $RPI_WS281X_VERSION" \
     --raw-line "" \
