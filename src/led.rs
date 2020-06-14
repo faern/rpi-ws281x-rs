@@ -32,7 +32,7 @@ impl Led {
     /// Creates a new [`Led`] instance with the given channel brightness values.
     #[inline(always)]
     pub const fn new(white: u8, red: u8, green: u8, blue: u8) -> Self {
-        Self(u32::from_be_bytes([white, red, green, blue]))
+        Self(sys::ws2811_led_t::from_be_bytes([white, red, green, blue]))
     }
 
     /// Creates a new [`Led`] from float values. The floats are still expected to be in the range
@@ -43,6 +43,30 @@ impl Led {
         let g = green.round().min(255.0).max(0.0) as u8;
         let b = blue.round().min(255.0).max(0.0) as u8;
         Self::new(w, r, g, b)
+    }
+
+    /// Returns the brightness value for the white channel.
+    pub const fn white(&self) -> u8 {
+        let [w, _r, _g, _b] = self.0.to_be_bytes();
+        w
+    }
+
+    /// Returns the brightness value for the red channel.
+    pub const fn red(&self) -> u8 {
+        let [_w, r, _g, _b] = self.0.to_be_bytes();
+        r
+    }
+
+    /// Returns the brightness value for the green channel.
+    pub const fn green(&self) -> u8 {
+        let [_w, _r, g, _b] = self.0.to_be_bytes();
+        g
+    }
+
+    /// Returns the brightness value for the blue channel.
+    pub const fn blue(&self) -> u8 {
+        let [_w, _r, _g, b] = self.0.to_be_bytes();
+        b
     }
 }
 
@@ -60,6 +84,10 @@ impl fmt::Debug for Led {
 
 impl core::ops::Add for Led {
     type Output = Self;
+
+    /// Adds together the brightness values for two `Led`s. This operation uses is saturating
+    /// addition. So if two `Led`s are added together and a channel value becomes more than 255,
+    /// the resulting `Led` will have brightness 255 for that channel.
     fn add(self, rhs: Self) -> Self {
         let [w1, r1, g1, b1] = self.0.to_be_bytes();
         let [w2, r2, g2, b2] = rhs.0.to_be_bytes();
@@ -136,5 +164,14 @@ mod tests {
 
         let bright = Led::new(201, 202, 203, 204);
         assert_eq!(bright + bright, Led::MAX);
+    }
+
+    #[test]
+    fn get_channels() {
+        let led = Led::new(1, 2, 100, 200);
+        assert_eq!(led.white(), 1);
+        assert_eq!(led.red(), 2);
+        assert_eq!(led.green(), 100);
+        assert_eq!(led.blue(), 200);
     }
 }
