@@ -3,6 +3,14 @@ name = "rpi-ws281x"
 version = "0.1.0"
 edition = "2018"
 authors = ["Linus Färnstrand <faern@faern.net>"]
+description = "Library for controlling ws2811/sk6812 type LED strips with a Raspberry Pi"
+keywords = ["ws2811", "sk6812", "led", "rpi"]
+categories = ["api-bindings"]
+repository = "https://github.com/faern/rpi-ws281x-rs"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 rpi-ws281x-sys = { path = "sys", version = "0.1" }
+
+[workspace]
+members = ["sys"]
