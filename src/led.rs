@@ -1,4 +1,5 @@
-use std::fmt;use crate::sys;
+use crate::sys;
+use std::fmt;
 
 /// Represents a single LED on a strip of ws281x LEDs. Contains a one byte value for the brightness
 /// of the red, green, blue and white channels of the LED. The library represents an LED strip

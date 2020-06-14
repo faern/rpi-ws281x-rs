@@ -21,12 +21,12 @@ const STD_DEV_BLUE: f32 = 0.12;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let led_count: u16 = 19;
 
-    let mut strip = rpi_ws281x::Builder::new(10)
+    let mut strip = rpi_ws281x::Controller::builder(10)
         .channel(
-            0,
-            rpi_ws281x::Channel::new(10, led_count)
+            rpi_ws281x::Channel::builder(10, led_count)
                 .strip_type(StripType::Grb)
-                .brightness(255),
+                .brightness(255)
+                .build(),
         )
         .build()?;
 

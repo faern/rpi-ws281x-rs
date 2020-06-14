@@ -1,7 +1,9 @@
 use std::convert::TryFrom;
+use std::mem;
 use std::os::raw::c_int;
 use std::ptr;
 
+/// Re-export of the low level bindings to `rpi_ws281x`.
 pub use rpi_ws281x_sys as sys;
 
 mod error;
@@ -9,16 +11,16 @@ pub use error::{Error, Result};
 mod led;
 pub use led::Led;
 
-/// A channel represents one GPIO pin sending a signal to one strip of LEDs.
-/// There can be up to `sys::RPI_PWM_CHANNELS` `Channel`s on one [`Controller`].
-///
-/// The channel instance is handed over to [`Builder::channel`].
-pub struct Channel(sys::ws2811_channel_t);
+/// `usize` version of `sys::RPI_PWM_CHANNELS`.
+pub const NUM_CHANNELS: usize = sys::RPI_PWM_CHANNELS as usize;
 
-impl Channel {
-    /// Creates a new channel on the given GPIO pin with the given amount of LEDs.
+#[repr(transparent)]
+pub struct ChannelBuilder(sys::ws2811_channel_t);
+
+impl ChannelBuilder {
+    /// Creates a new [`ChannelBuilder`] for the given GPIO pin with the given amount of LEDs.
     pub fn new(gpio_pin: u8, led_count: u16) -> Self {
-        Self(sys::ws2811_channel_t {
+        ChannelBuilder(sys::ws2811_channel_t {
             gpionum: c_int::from(gpio_pin),
             invert: 0,
             count: c_int::from(led_count),
@@ -51,9 +53,39 @@ impl Channel {
         self
     }
 
-    /// Returns a disabled LED strip channel. Used internally.
-    fn disabled_raw() -> sys::ws2811_channel_t {
-        sys::ws2811_channel_t {
+    pub fn build(self) -> Channel {
+        Channel(self.0)
+    }
+}
+
+/// A channel represents one GPIO pin sending a signal to one strip of LEDs.
+/// There can be up to `NUM_CHANNELS` `Channel`s on one [`Controller`].
+///
+/// The channel instance is handed over to [`Builder::channels`].
+#[repr(transparent)]
+pub struct Channel(sys::ws2811_channel_t);
+
+impl Channel {
+    /// Creates a new [`ChannelBuilder`] for the given GPIO pin with the given amount of LEDs.
+    pub fn builder(gpio_pin: u8, led_count: u16) -> ChannelBuilder {
+        ChannelBuilder::new(gpio_pin, led_count)
+    }
+
+    /// Returns a disabled LED strip channel.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use rpi_ws281x::{Channel, Controller};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let channel = Channel::builder(10, 25).build();
+    /// let controller = Controller::builder(10)
+    ///     .channels([channel, Channel::disabled()])
+    ///     .build()?;
+    /// # Ok(()) }
+    /// ```
+    pub fn disabled() -> Self {
+        Self(sys::ws2811_channel_t {
             gpionum: 0,
             invert: 0,
             count: 0,
@@ -65,16 +97,37 @@ impl Channel {
             gshift: 0,
             bshift: 0,
             gamma: ptr::null_mut(),
-        }
+        })
+    }
+
+    /// Creates a `Channel` directly from the underlying C struct. This is highly unsafe and
+    /// you are recommended to use the safe builder pattern via [`Channel::builder`] instead.
+    ///
+    /// # Safety
+    ///
+    /// `channel` must be correctly set up. See C library for implementation.
+    pub unsafe fn from_raw(channel: sys::ws2811_channel_t) -> Self {
+        Self(channel)
+    }
+}
+
+impl From<Channel> for sys::ws2811_channel_t {
+    fn from(channel: Channel) -> sys::ws2811_channel_t {
+        channel.0
     }
 }
 
 /// A builder for [`Controller`] structs. Sets up and initializes the hardware for controlling the
 /// LEDs and returns a controller that is then used for actually rendering anything to the LEDs.
-pub struct Builder(sys::ws2811_t);
+#[repr(transparent)]
+pub struct ControllerBuilder(sys::ws2811_t);
 
-impl Builder {
+impl ControllerBuilder {
     /// Creates a new [`Controller`] builder using the given DMA channel.
+    ///
+    /// Take care to use a free DMA channel. Selecting one that is already in use might interfere
+    /// with other hardware and for example corrupt your SD card. This code cannot recommend
+    /// a safe default since that depends on the hardware/firmware and OS version.
     pub fn new(dma_channel: u8) -> Self {
         Self(sys::ws2811_t {
             render_wait_time: 0,
@@ -82,8 +135,20 @@ impl Builder {
             rpi_hw: ptr::null(),
             freq: sys::WS2811_TARGET_FREQ,
             dmanum: i32::from(dma_channel),
-            channel: [Channel::disabled_raw(), Channel::disabled_raw()],
+            channel: [Channel::disabled().0, Channel::disabled().0],
         })
+    }
+
+    /// Creates a `ControllerBuilder` directly from the underlying C struct.
+    ///
+    /// This is highly unsafe and you are recommended to use the safe builder pattern via
+    /// [`Controller::builder`] instead.
+    ///
+    /// # Safety
+    ///
+    /// `controller` must be correctly set up. See C library for implementation.
+    pub unsafe fn from_raw(controller: sys::ws2811_t) -> Self {
+        Self(controller)
     }
 
     /// Sets the frequency in Hz that the controller will output data at.
@@ -92,20 +157,27 @@ impl Builder {
         self
     }
 
-    /// Sets a channel on the controller.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `index >= rpi_ws281x_sys::RPI_PWM_CHANNELS`.
-    pub fn channel(mut self, index: usize, channel: Channel) -> Self {
-        self.0.channel[index] = channel.0;
+    /// Sets the channel first on the controller. More convenient to call than
+    /// [`ControllerBuilder::channels`] for use cases with only one LED strip.
+    pub fn channel(mut self, channel: Channel) -> Self {
+        self.0.channel[0] = channel.0;
+        self
+    }
+
+    /// Sets all channels on the controller.
+    pub fn channels(mut self, channels: [Channel; NUM_CHANNELS]) -> Self {
+        // This transmute is safe because `Channel` is a newtype with `#[repr(transparent)]`.
+        self.0.channel = unsafe { mem::transmute(channels) };
         self
     }
 
     /// Tries to initialize the hardware to control LEDs in the way the builder is configured.
     /// Returns the [`Controller`] on success.
     pub fn build(mut self) -> Result<Controller> {
-        assert_eq!(usize::try_from(sys::RPI_PWM_CHANNELS).unwrap(), self.0.channel.len());
+        assert_eq!(
+            usize::try_from(sys::RPI_PWM_CHANNELS).unwrap(),
+            self.0.channel.len()
+        );
         match unsafe { sys::ws2811_init(&mut self.0) } {
             sys::ws2811_return_t::WS2811_SUCCESS => Ok(Controller(self.0)),
             error => Err(Error(error)),
@@ -114,10 +186,32 @@ impl Builder {
 }
 
 /// A ws281x LED controller. Instances of this type are created via the [`Builder`].
+#[repr(transparent)]
 pub struct Controller(sys::ws2811_t);
 
 impl Controller {
+    pub fn builder(dma_channel: u8) -> ControllerBuilder {
+        ControllerBuilder::new(dma_channel)
+    }
+
+    /// Creates a `Controller` directly from the underlying C struct.
+    ///
+    /// This is highly unsafe and you are recommended to use the safe builder pattern via
+    /// [`Controller::builder`] instead.
+    ///
+    /// # Safety
+    ///
+    /// `controller` must be correctly set up and [`sys::ws2811_init`] already called on it.
+    /// See C library for implementation.
+    pub unsafe fn from_raw(controller: sys::ws2811_t) -> Self {
+        Self(controller)
+    }
+
     /// Returns a mutable slice where all the LED values can be set directly.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `channel_index >= NUM_CHANNELS`.
     pub fn buffer<'a>(&'a mut self, channel_index: usize) -> &mut [Led] {
         // This casting to `*mut Led` is safe because Led is a newtype struct over ws2811_led_t
         // with #[repr(transparent])].
@@ -145,8 +239,8 @@ impl Controller {
     ///
     /// Panics if any of the `&[Led]` slices are not the same length as the corresponding
     /// [`Channel`]s `led_count` as given to the [`Channel`] constructor.
-    pub fn render_buffer(&mut self, buffers: [&[Led]; sys::RPI_PWM_CHANNELS as usize]) -> Result<()> {
-        let original_leds_ptrs: [*mut sys::ws2811_led_t; sys::RPI_PWM_CHANNELS as usize] =
+    pub fn render_buffer(&mut self, buffers: [&[Led]; NUM_CHANNELS]) -> Result<()> {
+        let original_leds_ptrs: [*mut sys::ws2811_led_t; NUM_CHANNELS] =
             [self.0.channel[0].leds, self.0.channel[1].leds];
 
         assert_eq!(self.0.channel[0].count as usize, buffers[0].len());

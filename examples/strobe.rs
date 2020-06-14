@@ -11,8 +11,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let on = vec![Led::ON; led_count as usize];
     let off = vec![Led::OFF; led_count as usize];
 
-    let mut strip = rpi_ws281x::Builder::new(10)
-        .channel(0, rpi_ws281x::Channel::new(10, led_count).brightness(100))
+    let mut strip = rpi_ws281x::Controller::builder(10)
+        .channel(
+            rpi_ws281x::Channel::builder(10, led_count)
+                .brightness(100)
+                .build(),
+        )
         .build()?;
 
     loop {
