@@ -8,8 +8,12 @@ pub use rpi_ws281x_sys as sys;
 
 mod error;
 pub use error::{Error, Result};
+
 mod led;
 pub use led::Led;
+
+mod strip_type;
+pub use strip_type::{InvalidStripTypeError, StripType};
 
 /// `usize` version of `sys::RPI_PWM_CHANNELS`.
 pub const NUM_CHANNELS: usize = sys::RPI_PWM_CHANNELS as usize;
@@ -261,31 +265,5 @@ impl Controller {
 impl Drop for Controller {
     fn drop(&mut self) {
         unsafe { sys::ws2811_fini(&mut self.0) };
-    }
-}
-
-/// Represents the type of LEDs that should be controlled. This controls the order that the
-/// separate color channels are transmitted in over the wire, and if the white channel is
-/// present or not.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-#[repr(u32)]
-pub enum StripType {
-    Rgb = sys::WS2811_STRIP_RGB,
-    Rbg = sys::WS2811_STRIP_RBG,
-    Grb = sys::WS2811_STRIP_GRB,
-    Gbr = sys::WS2811_STRIP_GBR,
-    Brg = sys::WS2811_STRIP_BRG,
-    Bgr = sys::WS2811_STRIP_BGR,
-    Rgbw = sys::SK6812_STRIP_RGBW,
-    Rbgw = sys::SK6812_STRIP_RBGW,
-    Grbw = sys::SK6812_STRIP_GRBW,
-    Gbrw = sys::SK6812_STRIP_GBRW,
-    Brgw = sys::SK6812_STRIP_BRGW,
-    Bgrw = sys::SK6812_STRIP_BGRW,
-}
-
-impl StripType {
-    fn as_raw(self) -> i32 {
-        i32::try_from(self as u32).unwrap()
     }
 }
