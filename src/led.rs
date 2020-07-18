@@ -36,16 +36,6 @@ impl Led {
         Self(sys::ws2811_led_t::from_be_bytes([white, red, green, blue]))
     }
 
-    /// Creates a new [`Led`] from float values. The floats are still expected to be in the range
-    /// `0-255` and will be clamped to that range.
-    fn from_f32s(white: f32, red: f32, green: f32, blue: f32) -> Self {
-        let w = white.round().min(255.0).max(0.0) as u8;
-        let r = red.round().min(255.0).max(0.0) as u8;
-        let g = green.round().min(255.0).max(0.0) as u8;
-        let b = blue.round().min(255.0).max(0.0) as u8;
-        Self::new(w, r, g, b)
-    }
-
     /// Returns the brightness value for the white channel.
     pub const fn white(&self) -> u8 {
         let [w, _r, _g, _b] = self.0.to_be_bytes();
@@ -111,11 +101,11 @@ impl core::ops::Mul<f32> for Led {
     type Output = Self;
     fn mul(self, rhs: f32) -> Self {
         let [w, r, g, b] = self.0.to_be_bytes();
-        let w = w as f32 * rhs;
-        let r = r as f32 * rhs;
-        let g = g as f32 * rhs;
-        let b = b as f32 * rhs;
-        Self::from_f32s(w, r, g, b)
+        let w = (w as f32 * rhs).round() as u8;
+        let r = (r as f32 * rhs).round() as u8;
+        let g = (g as f32 * rhs).round() as u8;
+        let b = (b as f32 * rhs).round() as u8;
+        Self::new(w, r, g, b)
     }
 }
 
